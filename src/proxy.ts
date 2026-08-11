@@ -73,96 +73,100 @@ export const proxyBeacon = (
     reqHeaders['User-Agent'] = httpReq.headers['user-agent'];
   }
 
-  const clientIp = config.resolveClientIp(httpReq);
-  if (clientIp) {
-    reqHeaders['X-Forwarded-For'] = clientIp;
-    reqHeaders['X-Connecting-IP'] = clientIp;
-  }
-
-  const url = new URL(`${config.serviceOrigin}/${config.trackingId}.gif${search}`);
-
-  upstreamReq = requestFn(
-    url,
-    {
-      method: 'GET',
-      headers: reqHeaders,
-      agent: keepAliveAgent,
-      timeout: config.upstreamTimeoutMs
-    },
-    (resp) => {
-      if (settled) {
-        resp.resume();
-        return;
-      }
-
-      for (const rawName in resp.headers) {
-        if (!Object.prototype.hasOwnProperty.call(resp.headers, rawName)) {
-          continue;
-        }
-        const value = resp.headers[rawName];
-        if (!value) {
-          continue;
-        }
-        const hName = rawName.toLowerCase();
-        if (httpResp.headersSent || httpResp.finished || httpResp.writableEnded) {
-          continue;
-        }
-
-        if (hName === 'set-cookie') {
-          const list = Array.isArray(value) ? value : [value];
-          const rewritten: string[] = [];
-          for (const item of list) {
-            if (config.forwardedCookies.has(setCookieName(item))) {
-              rewritten.push(
-                rewriteSetCookie(item, {
-                  trackingId: config.trackingId,
-                  beaconPath: config.beaconPath,
-                  hostname: config.hostname
-                })
-              );
-            }
-          }
-          if (rewritten.length) {
-            httpResp.setHeader('set-cookie', rewritten);
-          }
-          continue;
-        }
-
-        if (!config.responseHeaders.has(hName)) {
-          continue;
-        }
-        httpResp.setHeader(hName, value);
-      }
-
-      if (!httpResp.headersSent) {
-        httpResp.writeHead(resp.statusCode ?? 204);
-      }
-
-      resp.on('data', (chunk: Buffer | string) => {
-        if (!settled && !httpResp.finished && !httpResp.writableEnded && !httpResp.writableFinished) {
-          httpResp.write(chunk);
-        }
-      });
-
-      resp.on('end', () => {
-        settle({ destroyUpstream: false });
-      });
-
-      resp.on('error', () => {
-        settle({ statusCode: 204 });
-      });
-    }
-  );
-
   const onFail = (): void => {
     settle({ statusCode: 204 });
   };
 
-  httpReq.on('aborted', () => onFail());
-  httpReq.socket?.on('error', onFail);
-  upstreamReq.on('error', onFail);
-  upstreamReq.on('timeout', onFail);
+  try {
+    const clientIp = config.resolveClientIp(httpReq);
+    if (clientIp) {
+      reqHeaders['X-Forwarded-For'] = clientIp;
+      reqHeaders['X-Connecting-IP'] = clientIp;
+    }
 
-  upstreamReq.setNoDelay(true);
-  upstreamReq.end();
+    const url = new URL(`${config.serviceOrigin}/${config.trackingId}.gif${search}`);
+
+    upstreamReq = requestFn(
+      url,
+      {
+        method: 'GET',
+        headers: reqHeaders,
+        agent: keepAliveAgent,
+        timeout: config.upstreamTimeoutMs
+      },
+      (resp) => {
+        if (settled) {
+          resp.resume();
+          return;
+        }
+
+        for (const rawName in resp.headers) {
+          if (!Object.prototype.hasOwnProperty.call(resp.headers, rawName)) {
+            continue;
+          }
+          const value = resp.headers[rawName];
+          if (!value) {
+            continue;
+          }
+          const hName = rawName.toLowerCase();
+          if (httpResp.headersSent || httpResp.finished || httpResp.writableEnded) {
+            continue;
+          }
+
+          if (hName === 'set-cookie') {
+            const list = Array.isArray(value) ? value : [value];
+            const rewritten: string[] = [];
+            for (const item of list) {
+              if (config.forwardedCookies.has(setCookieName(item))) {
+                rewritten.push(
+                  rewriteSetCookie(item, {
+                    trackingId: config.trackingId,
+                    beaconPath: config.beaconPath,
+                    hostname: config.hostname
+                  })
+                );
+              }
+            }
+            if (rewritten.length) {
+              httpResp.setHeader('set-cookie', rewritten);
+            }
+            continue;
+          }
+
+          if (!config.responseHeaders.has(hName)) {
+            continue;
+          }
+          httpResp.setHeader(hName, value);
+        }
+
+        if (!httpResp.headersSent) {
+          httpResp.writeHead(resp.statusCode ?? 204);
+        }
+
+        resp.on('data', (chunk: Buffer | string) => {
+          if (!settled && !httpResp.finished && !httpResp.writableEnded && !httpResp.writableFinished) {
+            httpResp.write(chunk);
+          }
+        });
+
+        resp.on('end', () => {
+          settle({ destroyUpstream: false });
+        });
+
+        resp.on('error', () => {
+          settle({ statusCode: 204 });
+        });
+      }
+    );
+
+    httpReq.on('aborted', () => onFail());
+    httpReq.socket?.on('error', onFail);
+    upstreamReq.on('error', onFail);
+    upstreamReq.on('timeout', onFail);
+
+    upstreamReq.setNoDelay(true);
+    upstreamReq.end();
+  } catch {
+    settle({ statusCode: 204 });
+  }
 };

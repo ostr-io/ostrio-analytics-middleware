@@ -294,6 +294,25 @@ describe('handle proxy', () => {
     expect(list.join('\n')).to.not.match(/session=/i);
   });
 
+  it('setup error (invalid serviceOrigin) → 204, no throw to host', () => {
+    requestStub = sinon.stub(https, 'request');
+    const mw = new OstrioAnalyticsMiddleware({ ...base, serviceOrigin: '::::' });
+    const res = fakeRes();
+    expect(() => mw.handle(fakeReq({ method: 'GET', url: beaconUrl }), res)).to.not.throw();
+    expect(requestStub.called).to.equal(false);
+    expect(res.statusCode).to.equal(204);
+    expect(res.finished).to.equal(true);
+  });
+
+  it('setup error (request throws) → 204, no throw to host', () => {
+    requestStub = sinon.stub(https, 'request').throws(new Error('request boom'));
+    const mw = new OstrioAnalyticsMiddleware(base);
+    const res = fakeRes();
+    expect(() => mw.handle(fakeReq({ method: 'GET', url: beaconUrl }), res)).to.not.throw();
+    expect(res.statusCode).to.equal(204);
+    expect(res.finished).to.equal(true);
+  });
+
   it('relays only allowlisted response headers', () => {
     requestStub = sinon.stub(https, 'request').callsFake((_url: unknown, _opts: unknown, cb: unknown) => {
       const callback = cb as (res: FakeIncoming) => void;
@@ -318,5 +337,97 @@ describe('handle proxy', () => {
     expect(res._headers['cache-control']).to.equal('no-store');
     expect(res._headers.location).to.equal(undefined);
     expect(res._headers['x-powered-by']).to.equal(undefined);
+  });
+});
+
+describe('handle proxy settle', () => {
+  let requestStub: sinon.SinonStub;
+  let clock: sinon.SinonFakeTimers;
+
+  beforeEach(() => {
+    clock = sinon.useFakeTimers();
+  });
+
+  afterEach(() => {
+    clock.restore();
+    if (requestStub) {
+      requestStub.restore();
+    }
+  });
+
+  it('wall timeout → 204 once (single-flight)', () => {
+    requestStub = sinon.stub(https, 'request').callsFake(() => {
+      return createFakeClientReq() as unknown as ReturnType<typeof https.request>;
+    });
+
+    const mw = new OstrioAnalyticsMiddleware({ ...base, wallTimeoutMs: 100 });
+    const res = fakeRes();
+    let endCalls = 0;
+    const origEnd = res.end.bind(res);
+    res.end = ((chunk?: Buffer | string) => {
+      endCalls += 1;
+      return origEnd(chunk);
+    }) as FakeRes['end'];
+
+    mw.handle(fakeReq({ method: 'GET', url: beaconUrl }), res);
+    expect(res.finished).to.equal(false);
+
+    clock.tick(100);
+    expect(res.statusCode).to.equal(204);
+    expect(res.finished).to.equal(true);
+    expect(endCalls).to.equal(1);
+
+    clock.tick(100);
+    expect(endCalls).to.equal(1);
+  });
+
+  it('upstream timeout → 204 once (single-flight)', () => {
+    requestStub = sinon.stub(https, 'request').callsFake(() => {
+      const clientReq = createFakeClientReq(() => {
+        clientReq.emit('timeout');
+      });
+      return clientReq as unknown as ReturnType<typeof https.request>;
+    });
+
+    const mw = new OstrioAnalyticsMiddleware(base);
+    const res = fakeRes();
+    let endCalls = 0;
+    const origEnd = res.end.bind(res);
+    res.end = ((chunk?: Buffer | string) => {
+      endCalls += 1;
+      return origEnd(chunk);
+    }) as FakeRes['end'];
+
+    mw.handle(fakeReq({ method: 'GET', url: beaconUrl }), res);
+
+    expect(res.statusCode).to.equal(204);
+    expect(res.finished).to.equal(true);
+    expect(endCalls).to.equal(1);
+  });
+
+  it('client abort → 204 once (single-flight)', () => {
+    requestStub = sinon.stub(https, 'request').callsFake(() => {
+      return createFakeClientReq() as unknown as ReturnType<typeof https.request>;
+    });
+
+    const req = fakeReq({ method: 'GET', url: beaconUrl });
+    const res = fakeRes();
+    let endCalls = 0;
+    const origEnd = res.end.bind(res);
+    res.end = ((chunk?: Buffer | string) => {
+      endCalls += 1;
+      return origEnd(chunk);
+    }) as FakeRes['end'];
+
+    const mw = new OstrioAnalyticsMiddleware(base);
+    mw.handle(req, res);
+    req.emit('aborted');
+
+    expect(res.statusCode).to.equal(204);
+    expect(res.finished).to.equal(true);
+    expect(endCalls).to.equal(1);
+
+    req.emit('aborted');
+    expect(endCalls).to.equal(1);
   });
 });
