@@ -26,4 +26,13 @@ export class OstrioAnalyticsMiddleware {
 
     proxyBeacon(req, res, this.config, search);
   }
+
+  middleware() {
+    return (req: IncomingMessage, res: ServerResponse, next: () => void) => {
+      if (this.handle(req, res) !== false) {
+        return;
+      }
+      next();
+    };
+  }
 }
