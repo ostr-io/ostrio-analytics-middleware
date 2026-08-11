@@ -78,7 +78,8 @@ createServer((req, res) => {
 
 ## Client usage (`createTracker`)
 
-Import from the `./client` subpath (re-exports `ostrio-analytics` types):
+Import from the `./client` subpath (re-exports `ostrio-analytics` types).
+Meteor 2.x ignores `package.json` `exports`; root `client.js` / `client.cjs` shims keep this import resolvable.
 
 ```js
 import { createTracker } from 'ostrio-analytics-middleware/client';
