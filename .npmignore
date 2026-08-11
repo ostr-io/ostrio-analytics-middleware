@@ -4,7 +4,8 @@
 .eslintrc
 .github
 .npm
-docs/superpowers
+docs
+.superpowers
 test
 node_modules
 npm-debug.log*
