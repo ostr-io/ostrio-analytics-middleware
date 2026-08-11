@@ -7,9 +7,9 @@ import {
 
 import {
   createTracker,
-  OstrioWebAnalytics,
   Transport,
   type CreateTrackerOptions,
+  type OstrioWebAnalytics,
   type OstrioWebAnalyticsConfig
 } from 'ostrio-analytics-middleware/client';
 

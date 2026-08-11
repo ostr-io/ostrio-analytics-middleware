@@ -21,22 +21,30 @@ const endClient = (httpResp: ServerResponse, statusCode?: number): void => {
   }
 };
 
+const defaultRequestFn: HttpsRequestFn = (url, options, callback) =>
+  https.request(url, options, callback);
+
 export const proxyBeacon = (
   httpReq: IncomingMessage,
   httpResp: ServerResponse,
   config: ResolvedMiddlewareConfig,
   search: string,
-  requestFn: HttpsRequestFn = https.request.bind(https) as HttpsRequestFn
+  requestFn: HttpsRequestFn = defaultRequestFn
 ): void => {
   let settled = false;
   let upstreamReq: ClientRequest | null = null;
+  const timers = {
+    wall: undefined as ReturnType<typeof setTimeout> | undefined
+  };
 
-  const settle = (opts: { statusCode?: number; destroyUpstream?: boolean } = {}): void => {
+  function settle(opts: { statusCode?: number; destroyUpstream?: boolean } = {}): void {
     if (settled) {
       return;
     }
     settled = true;
-    clearTimeout(wallTimer);
+    if (timers.wall !== undefined) {
+      clearTimeout(timers.wall);
+    }
     if (opts.destroyUpstream !== false && upstreamReq && !upstreamReq.destroyed) {
       try {
         upstreamReq.destroy();
@@ -45,9 +53,9 @@ export const proxyBeacon = (
       }
     }
     endClient(httpResp, opts.statusCode);
-  };
+  }
 
-  const wallTimer = setTimeout(() => {
+  timers.wall = setTimeout(() => {
     settle({ statusCode: 204 });
   }, config.wallTimeoutMs);
 

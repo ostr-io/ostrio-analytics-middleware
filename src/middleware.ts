@@ -25,6 +25,7 @@ export class OstrioAnalyticsMiddleware {
     }
 
     proxyBeacon(req, res, this.config, search);
+    return undefined;
   }
 
   middleware() {
