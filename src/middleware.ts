@@ -28,7 +28,7 @@ export class OstrioAnalyticsMiddleware {
   }
 
   middleware() {
-    return (req: IncomingMessage, res: ServerResponse, next: () => void) => {
+    return (req: IncomingMessage, res: ServerResponse, next: (err?: unknown) => void) => {
       if (this.handle(req, res) !== false) {
         return;
       }
