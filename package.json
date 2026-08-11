@@ -1,0 +1,72 @@
+{
+  "name": "ostrio-analytics-middleware",
+  "version": "1.0.0",
+  "description": "First-party Connect middleware proxy for ostr.io web analytics beacons",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "default": "./dist/index.js"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "import": "./dist/client.js",
+      "require": "./dist/client.cjs",
+      "default": "./dist/client.js"
+    }
+  },
+  "files": ["dist", "src", "docs", "README.md", "LICENSE", "package.json"],
+  "scripts": {
+    "clean": "rimraf dist",
+    "build:types": "tsc -p tsconfig.types.json",
+    "build:rollup": "rollup -c --forceExit",
+    "build": "npm run clean && npm run build:rollup && npm run build:types",
+    "prepublishOnly": "npm run build",
+    "test": "TS_NODE_PROJECT=tsconfig.test.json node --loader ts-node/esm ./node_modules/mocha/bin/mocha.js --extension ts 'test/**/*.spec.ts'",
+    "test:exports": "node test/exports/esm.mjs && node test/exports/cjs.cjs",
+    "test:types": "tsc -p test/types/tsconfig.node.json && tsc -p test/types/tsconfig.bun.json",
+    "lint": "eslint ./src ./test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ostr-io/ostrio-analytics-middleware.git"
+  },
+  "homepage": "https://ostr.io/",
+  "bugs": { "url": "https://github.com/ostr-io/ostrio-analytics-middleware/issues" },
+  "author": "dr.dimitru (https://veliovgroup.com)",
+  "license": "BSD-3-Clause",
+  "engines": { "node": ">=18" },
+  "peerDependencies": {
+    "ostrio-analytics": "^2.0.0"
+  },
+  "peerDependenciesMeta": {
+    "ostrio-analytics": { "optional": true }
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^29.0.0",
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "@rollup/plugin-typescript": "^12.3.0",
+    "@types/chai": "^5.2.3",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.10.0",
+    "@types/sinon": "^21.0.0",
+    "chai": "^6.2.1",
+    "eslint": "^9.39.1",
+    "mocha": "^11.7.5",
+    "ostrio-analytics": "^2.0.0",
+    "rimraf": "^6.1.2",
+    "rollup": "^4.53.3",
+    "sinon": "^21.0.0",
+    "ts-node": "^10.9.2",
+    "tslib": "^2.8.1",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.48.0"
+  },
+  "keywords": ["ostr.io", "analytics", "middleware", "connect", "express", "meteor", "GDPR"]
+}
