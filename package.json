@@ -24,6 +24,8 @@
   "files": [
     "dist",
     "src",
+    "client.js",
+    "client.cjs",
     "docs",
     "README.md",
     "LICENSE",
