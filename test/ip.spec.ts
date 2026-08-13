@@ -7,20 +7,20 @@ describe('defaultResolveClientIp', () => {
     expect(defaultResolveClientIp({
       headers: { 'cf-ray': '1', 'cf-connecting-ip': '1.2.3.4' },
       socket: { remoteAddress: '9.9.9.9' }
-    } as IncomingMessage)).to.equal('1.2.3.4');
+    } as unknown as IncomingMessage)).to.equal('1.2.3.4');
   });
 
   it('ignores cf-connecting-ip without cf-ray', () => {
     expect(defaultResolveClientIp({
       headers: { 'cf-connecting-ip': '1.2.3.4', 'x-forwarded-for': '8.8.8.8' },
       socket: { remoteAddress: '9.9.9.9' }
-    } as IncomingMessage)).to.equal('9.9.9.9');
+    } as unknown as IncomingMessage)).to.equal('9.9.9.9');
   });
 
   it('ignores duplicate Cloudflare IP headers instead of forwarding an array', () => {
     expect(defaultResolveClientIp({
       headers: { 'cf-ray': '1', 'cf-connecting-ip': ['1.2.3.4', '5.6.7.8'] },
       socket: { remoteAddress: '9.9.9.9' }
-    } as IncomingMessage)).to.equal('9.9.9.9');
+    } as unknown as IncomingMessage)).to.equal('9.9.9.9');
   });
 });

@@ -21,11 +21,11 @@ type FakeReqOpts = {
 };
 
 const fakeReq = (opts: FakeReqOpts = {}): IncomingMessage => {
-  const ee = new EventEmitter() as IncomingMessage & EventEmitter;
+  const ee = new EventEmitter() as unknown as IncomingMessage & EventEmitter;
   ee.method = opts.method ?? 'GET';
   ee.url = opts.url ?? '/';
   ee.headers = opts.headers ?? {};
-  const socket = new EventEmitter() as IncomingMessage['socket'] & EventEmitter;
+  const socket = new EventEmitter() as unknown as IncomingMessage['socket'] & EventEmitter;
   (socket as { remoteAddress?: string }).remoteAddress = opts.remoteAddress ?? '127.0.0.1';
   ee.socket = socket;
   return ee;
@@ -77,7 +77,7 @@ const fakeRes = (): FakeRes => {
       return this;
     }
   };
-  return res as FakeRes;
+  return res as unknown as FakeRes;
 };
 
 type FakeIncoming = EventEmitter & {
