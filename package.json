@@ -1,6 +1,6 @@
 {
   "name": "@ostrio/analytics-middleware",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "First-party Connect middleware proxy for ostr.io web analytics beacons",
   "type": "module",
   "sideEffects": false,
@@ -13,7 +13,9 @@
   "types": "./dist/index.d.ts",
   "typesVersions": {
     "*": {
-      "client": ["dist/client.d.ts"]
+      "client": [
+        "dist/client.d.ts"
+      ]
     }
   },
   "exports": {
