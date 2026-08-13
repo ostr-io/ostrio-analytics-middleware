@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import globalJsdom from 'global-jsdom';
 import sinon from 'sinon';
-import { createTracker } from '../src/client.js';
+import { createTracker, Transport } from '../src/client.js';
 
 describe('createTracker', () => {
   let cleanup: () => void;
@@ -36,7 +36,7 @@ describe('createTracker', () => {
     const t = createTracker({
       trackingId: '72Dymb73P94vgPYeB',
       endpoint: '/service/__a',
-      transport: 'img',
+      transport: Transport.Img,
       auto: true
     });
     expect(t.transport).to.equal('img');
