@@ -4,7 +4,12 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "noEmit": true,
-    "types": []
+    "types": [],
+    "baseUrl": ".",
+    "paths": {
+      "@ostrio/analytics-middleware": ["../../dist/index.d.ts"],
+      "@ostrio/analytics-middleware/client": ["../../dist/client.d.ts"]
+    }
   },
   "include": ["./bun-bundler.ts"]
 }

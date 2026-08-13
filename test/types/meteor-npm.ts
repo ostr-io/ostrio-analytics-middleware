@@ -2,31 +2,22 @@ import {
   OstrioAnalyticsMiddleware,
   type OstrioAnalyticsMiddlewareConfig
 } from '@ostrio/analytics-middleware';
-
-import {
-  createTracker,
-  Transport,
-  type CreateTrackerOptions
-} from '@ostrio/analytics-middleware/client';
+import { createTracker, type CreateTrackerOptions } from '@ostrio/analytics-middleware/client';
 
 const config = {
   trackingId: 'fffffffffffffffff',
-  endpoint: '/__a',
+  endpoint: '/service/__a',
   hostname: 'example.test'
 } satisfies OstrioAnalyticsMiddlewareConfig;
 
 const middleware = new OstrioAnalyticsMiddleware(config);
-
-const trackerOpts = {
-  trackingId: 'fffffffffffffffff',
-  endpoint: '/__a',
-  auto: false,
-  transport: Transport.Fetch
+const trackerOptions = {
+  trackingId: config.trackingId,
+  endpoint: config.endpoint,
+  auto: false
 } satisfies CreateTrackerOptions;
+const tracker = createTracker(trackerOptions);
 
-const tracker = createTracker(trackerOpts);
-tracker.setTransport(Transport.Beacon);
+tracker.track();
 tracker.destroy();
-
 void middleware;
-void tracker;

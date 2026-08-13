@@ -127,6 +127,34 @@ describe('OstrioAnalyticsMiddleware constructor', () => {
   it('throws when endpoint empty', () => {
     expect(() => new OstrioAnalyticsMiddleware({ ...base, endpoint: '' })).to.throw();
   });
+
+  it('rejects tracking ids with unsafe path characters', () => {
+    expect(() => new OstrioAnalyticsMiddleware({ ...base, trackingId: '1234567890123456!' })).to.throw();
+  });
+
+  it('normalizes trailing endpoint slashes', () => {
+    const mw = new OstrioAnalyticsMiddleware({ ...base, endpoint: '/service/__a/' });
+    expect(mw.config.endpoint).to.equal('/service/__a');
+    expect(mw.config.beaconPath).to.equal(beaconUrl);
+  });
+
+  it('rejects endpoint paths with ..', () => {
+    expect(() => new OstrioAnalyticsMiddleware({ ...base, endpoint: '/service/../__a' })).to.throw();
+  });
+
+  it('rejects hostname values that can break Set-Cookie', () => {
+    expect(() => new OstrioAnalyticsMiddleware({ ...base, hostname: 'example.com\r\nX: 1' })).to.throw();
+  });
+
+  it('rejects non-HTTPS serviceOrigin at construction', () => {
+    expect(() => new OstrioAnalyticsMiddleware({ ...base, serviceOrigin: 'http://analytics.ostr.io' })).to.throw();
+    expect(() => new OstrioAnalyticsMiddleware({ ...base, serviceOrigin: '::::' })).to.throw();
+  });
+
+  it('stores serviceOrigin as a normalized https origin', () => {
+    const mw = new OstrioAnalyticsMiddleware({ ...base, serviceOrigin: 'https://analytics.ostr.io/ignored' });
+    expect(mw.config.serviceOrigin).to.equal('https://analytics.ostr.io');
+  });
 });
 
 describe('handle matching', () => {
@@ -163,6 +191,12 @@ describe('handle matching', () => {
   it('returns false when pathname only starts with endpoint', () => {
     const mw = new OstrioAnalyticsMiddleware(base);
     expect(mw.handle(fakeReq({ method: 'GET', url: '/service/__abc/72Dymb73P94vgPYeB.gif' }), fakeRes())).to.equal(false);
+    expect(requestStub.called).to.equal(false);
+  });
+
+  it('returns false for an invalid request URL', () => {
+    const mw = new OstrioAnalyticsMiddleware(base);
+    expect(mw.handle(fakeReq({ method: 'GET', url: '[' }), fakeRes())).to.equal(false);
     expect(requestStub.called).to.equal(false);
   });
 });
@@ -202,6 +236,25 @@ describe('handle proxy', () => {
     expect(String(capturedUrl)).to.equal(`https://analytics.ostr.io/${base.trackingId}.gif?x=1`);
     expect(capturedOpts?.method).to.equal('GET');
     expect(res.finished).to.equal(true);
+  });
+
+  it('joins an upstream origin with a trailing slash without duplicating it', () => {
+    let capturedUrl: URL | string | undefined;
+    requestStub = sinon.stub(https, 'request').callsFake((url: unknown, _opts: unknown, cb: unknown) => {
+      capturedUrl = url as URL;
+      const callback = cb as (res: FakeIncoming) => void;
+      const clientReq = createFakeClientReq(() => {
+        const resp = fakeUpstreamResp(204, {});
+        callback(resp);
+        resp.emit('end');
+      });
+      return clientReq as unknown as ReturnType<typeof https.request>;
+    });
+
+    const mw = new OstrioAnalyticsMiddleware({ ...base, serviceOrigin: 'https://analytics.ostr.io/' });
+    mw.handle(fakeReq({ method: 'GET', url: `${beaconUrl}?x=1` }), fakeRes());
+
+    expect(String(capturedUrl)).to.equal(`https://analytics.ostr.io/${base.trackingId}.gif?x=1`);
   });
 
   it('forwards only ot cookie', () => {
@@ -261,6 +314,27 @@ describe('handle proxy', () => {
     expect(res.finished).to.equal(true);
   });
 
+  it('on upstream response stream error → response 204 without partial body', () => {
+    requestStub = sinon.stub(https, 'request').callsFake((_url: unknown, _opts: unknown, cb: unknown) => {
+      const callback = cb as (res: FakeIncoming) => void;
+      const clientReq = createFakeClientReq(() => {
+        const resp = fakeUpstreamResp(200, { 'content-type': 'image/gif' });
+        callback(resp);
+        resp.emit('data', Buffer.from('partial'));
+        resp.emit('error', new Error('stream fail'));
+      });
+      return clientReq as unknown as ReturnType<typeof https.request>;
+    });
+
+    const mw = new OstrioAnalyticsMiddleware(base);
+    const res = fakeRes();
+    mw.handle(fakeReq({ method: 'GET', url: beaconUrl }), res);
+
+    expect(res.statusCode).to.equal(204);
+    expect(res._body).to.deep.equal([]);
+    expect(res.finished).to.equal(true);
+  });
+
   it('rewrites multiple set-cookie for ot only; drops other cookie names', () => {
     requestStub = sinon.stub(https, 'request').callsFake((_url: unknown, _opts: unknown, cb: unknown) => {
       const callback = cb as (res: FakeIncoming) => void;
@@ -292,16 +366,6 @@ describe('handle proxy', () => {
     expect(list[0]).to.not.include('analytics.ostr.io');
     expect(list[1]).to.include(beaconUrl);
     expect(list.join('\n')).to.not.match(/session=/i);
-  });
-
-  it('setup error (invalid serviceOrigin) → 204, no throw to host', () => {
-    requestStub = sinon.stub(https, 'request');
-    const mw = new OstrioAnalyticsMiddleware({ ...base, serviceOrigin: '::::' });
-    const res = fakeRes();
-    expect(() => mw.handle(fakeReq({ method: 'GET', url: beaconUrl }), res)).to.not.throw();
-    expect(requestStub.called).to.equal(false);
-    expect(res.statusCode).to.equal(204);
-    expect(res.finished).to.equal(true);
   });
 
   it('setup error (request throws) → 204, no throw to host', () => {
@@ -357,7 +421,13 @@ describe('handle proxy settle', () => {
 
   it('wall timeout → 204 once (single-flight)', () => {
     requestStub = sinon.stub(https, 'request').callsFake(() => {
-      return createFakeClientReq() as unknown as ReturnType<typeof https.request>;
+      const clientReq = createFakeClientReq();
+      const destroy = clientReq.destroy;
+      clientReq.destroy = () => {
+        destroy();
+        clientReq.emit('error', new Error('destroyed'));
+      };
+      return clientReq as unknown as ReturnType<typeof https.request>;
     });
 
     const mw = new OstrioAnalyticsMiddleware({ ...base, wallTimeoutMs: 100 });
@@ -429,5 +499,24 @@ describe('handle proxy settle', () => {
 
     req.emit('aborted');
     expect(endCalls).to.equal(1);
+  });
+
+  it('removes request and socket listeners after settling', () => {
+    requestStub = sinon.stub(https, 'request').callsFake(() => {
+      return createFakeClientReq() as unknown as ReturnType<typeof https.request>;
+    });
+
+    const req = fakeReq({ method: 'GET', url: beaconUrl });
+    const res = fakeRes();
+    const socket = req.socket as EventEmitter;
+    const mw = new OstrioAnalyticsMiddleware(base);
+    mw.handle(req, res);
+    expect(req.listenerCount('aborted')).to.equal(1);
+    expect(socket.listenerCount('error')).to.equal(1);
+
+    req.emit('aborted');
+
+    expect(req.listenerCount('aborted')).to.equal(0);
+    expect(socket.listenerCount('error')).to.equal(0);
   });
 });

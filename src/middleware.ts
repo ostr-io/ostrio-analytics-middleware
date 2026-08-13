@@ -19,7 +19,13 @@ export class OstrioAnalyticsMiddleware {
       return false;
     }
 
-    const { pathname, search } = parseRequestUrl(req);
+    let pathname: string;
+    let search: string;
+    try {
+      ({ pathname, search } = parseRequestUrl(req));
+    } catch {
+      return false;
+    }
     if (pathname !== this.config.beaconPath) {
       return false;
     }

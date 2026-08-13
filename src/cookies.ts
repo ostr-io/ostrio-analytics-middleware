@@ -1,5 +1,4 @@
 export interface RewriteSetCookieOptions {
-  trackingId: string;
   beaconPath: string;
   hostname: string;
 }
@@ -36,9 +35,30 @@ export const setCookieName = (setCookie: string): string => {
 
 export const rewriteSetCookie = (
   cookie: string,
-  { trackingId, beaconPath, hostname }: RewriteSetCookieOptions
+  { beaconPath, hostname }: RewriteSetCookieOptions
 ): string => {
-  return cookie
-    .replace(`/${trackingId}.gif`, beaconPath)
-    .replace(/analytics\.ostr\.io/gi, hostname);
+  const parts = cookie.split(';');
+  const nameValue = parts.shift() || '';
+  let hasPath = false;
+
+  const attributes = parts.map((attribute) => {
+    const path = /^(\s*path\s*=\s*)(.*)$/i.exec(attribute);
+    if (path) {
+      hasPath = true;
+      return `${path[1]}${beaconPath}`;
+    }
+
+    const domain = /^(\s*domain\s*=\s*)(.*)$/i.exec(attribute);
+    if (domain) {
+      return `${domain[1]}${hostname}`;
+    }
+
+    return attribute;
+  });
+
+  if (!hasPath) {
+    attributes.push(` Path=${beaconPath}`);
+  }
+
+  return [nameValue, ...attributes].join(';');
 };

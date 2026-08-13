@@ -19,11 +19,24 @@ const toLowerSet = (names: string[]): Set<string> => {
   return out;
 };
 
+const resolveServiceOrigin = (value: string): string => {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error('OstrioAnalyticsMiddleware: serviceOrigin must be a valid HTTPS origin');
+  }
+  if (url.protocol !== 'https:' || url.username || url.password) {
+    throw new Error('OstrioAnalyticsMiddleware: serviceOrigin must be a valid HTTPS origin');
+  }
+  return url.origin;
+};
+
 export const resolveConfig = (
   config: OstrioAnalyticsMiddlewareConfig
 ): ResolvedMiddlewareConfig => {
-  if (typeof config.trackingId !== 'string' || config.trackingId.length !== 17) {
-    throw new Error('OstrioAnalyticsMiddleware: trackingId must be exactly 17 characters');
+  if (typeof config.trackingId !== 'string' || !/^[A-Za-z0-9_-]{17}$/.test(config.trackingId)) {
+    throw new Error('OstrioAnalyticsMiddleware: trackingId must be exactly 17 URL-safe characters');
   }
   if (typeof config.endpoint !== 'string' || config.endpoint.length === 0) {
     throw new Error('OstrioAnalyticsMiddleware: endpoint must be a non-empty string');
@@ -31,17 +44,25 @@ export const resolveConfig = (
   if (typeof config.hostname !== 'string' || config.hostname.length === 0) {
     throw new Error('OstrioAnalyticsMiddleware: hostname must be a non-empty string');
   }
+  if (/[\s;,"\r\n\0]/.test(config.hostname)) {
+    throw new Error('OstrioAnalyticsMiddleware: hostname must not contain whitespace or cookie delimiters');
+  }
 
-  const serviceOrigin = config.serviceOrigin ?? DEFAULT_SERVICE_ORIGIN;
+  const endpoint = config.endpoint.replace(/\/+$/, '');
+  if (!endpoint || !endpoint.startsWith('/') || /[\s?#]/.test(endpoint) || endpoint.includes('..')) {
+    throw new Error('OstrioAnalyticsMiddleware: endpoint must be a URL path without trailing slash');
+  }
+
+  const serviceOrigin = resolveServiceOrigin(config.serviceOrigin ?? DEFAULT_SERVICE_ORIGIN);
   const defaultReferer = config.defaultReferer ?? `https://${config.hostname}/`;
   const forwardedCookies = toLowerSet(config.forwardedCookies ?? DEFAULT_FORWARDED_COOKIES);
   const responseHeaders = toLowerSet(config.responseHeaders ?? DEFAULT_RESPONSE_HEADERS);
 
   return {
     trackingId: config.trackingId,
-    endpoint: config.endpoint,
+    endpoint,
     hostname: config.hostname,
-    beaconPath: `${config.endpoint}/${config.trackingId}.gif`,
+    beaconPath: `${endpoint}/${config.trackingId}.gif`,
     serviceOrigin,
     defaultReferer,
     forwardedCookies,

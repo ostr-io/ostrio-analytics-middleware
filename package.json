@@ -1,12 +1,21 @@
 {
-  "name": "ostrio-analytics-middleware",
+  "name": "@ostrio/analytics-middleware",
   "version": "1.0.0",
   "description": "First-party Connect middleware proxy for ostr.io web analytics beacons",
   "type": "module",
   "sideEffects": false,
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "client": ["dist/client.d.ts"]
+    }
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -23,12 +32,12 @@
   },
   "files": [
     "dist",
-    "src",
     "client.js",
     "client.cjs",
     "README.md",
     "LICENSE",
-    "package.json"
+    "package.json",
+    "skills"
   ],
   "scripts": {
     "clean": "rimraf dist",
@@ -38,7 +47,7 @@
     "prepublishOnly": "npm run build",
     "test": "TS_NODE_PROJECT=tsconfig.test.json node --loader ts-node/esm ./node_modules/mocha/bin/mocha.js --extension ts 'test/**/*.spec.ts'",
     "test:exports": "node test/exports/esm.mjs && node test/exports/cjs.cjs",
-    "test:types": "tsc -p test/types/tsconfig.node.json && tsc -p test/types/tsconfig.bun.json",
+    "test:types": "tsc -p test/types/tsconfig.node.json && tsc -p test/types/tsconfig.bun.json && tsc -p test/types/tsconfig.meteor.json",
     "lint": "eslint ./src ./test"
   },
   "repository": {
@@ -63,6 +72,7 @@
     }
   },
   "devDependencies": {
+    "@ostrio/analytics-middleware": "file:.",
     "@rollup/plugin-commonjs": "^29.0.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-typescript": "^12.3.0",

@@ -2,10 +2,14 @@ import OstrioWebAnalytics, {
   type OstrioWebAnalyticsConfig,
   Transport
 } from 'ostrio-analytics';
-import type { CreateTrackerOptions } from './types.js';
 
 export { OstrioWebAnalytics, Transport };
-export type { OstrioWebAnalyticsConfig, CreateTrackerOptions };
+export type { OstrioWebAnalyticsConfig };
+
+export interface CreateTrackerOptions extends OstrioWebAnalyticsConfig {
+  trackingId: string;
+  endpoint: string;
+}
 
 export const createTracker = (opts: CreateTrackerOptions): OstrioWebAnalytics => {
   const { trackingId, endpoint, ...rest } = opts;

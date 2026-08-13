@@ -1,8 +1,8 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "ESNext",
+    "moduleResolution": "node",
     "noEmit": true,
     "types": [],
     "baseUrl": ".",
@@ -11,5 +11,5 @@
       "@ostrio/analytics-middleware/client": ["../../dist/client.d.ts"]
     }
   },
-  "include": ["./node-esm.ts"]
+  "include": ["./meteor-npm.ts"]
 }

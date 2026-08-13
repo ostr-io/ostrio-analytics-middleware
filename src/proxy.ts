@@ -4,7 +4,12 @@ import type { RequestOptions } from 'node:https';
 import type { ResolvedMiddlewareConfig } from './types.js';
 import { filterCookies, rewriteSetCookie, setCookieName } from './cookies.js';
 
-const keepAliveAgent = new https.Agent({ keepAlive: true });
+const keepAliveAgent = new https.Agent({
+  keepAlive: true,
+  maxSockets: 64,
+  maxFreeSockets: 8
+});
+const MAX_UPSTREAM_BODY_BYTES = 256 * 1024;
 
 export type HttpsRequestFn = (
   url: string | URL,
@@ -33,8 +38,28 @@ export const proxyBeacon = (
 ): void => {
   let settled = false;
   let upstreamReq: ClientRequest | null = null;
+  const clientSocket = httpReq.socket;
+  let onClientAborted: (() => void) | undefined;
+  let onClientSocketError: (() => void) | undefined;
+  let onUpstreamError: (() => void) | undefined;
+  let onUpstreamTimeout: (() => void) | undefined;
   const timers = {
     wall: undefined as ReturnType<typeof setTimeout> | undefined
+  };
+
+  const cleanup = (): void => {
+    if (onClientAborted) {
+      httpReq.removeListener('aborted', onClientAborted);
+    }
+    if (onClientSocketError && clientSocket) {
+      clientSocket.removeListener('error', onClientSocketError);
+    }
+    if (upstreamReq && onUpstreamError) {
+      upstreamReq.removeListener('error', onUpstreamError);
+    }
+    if (upstreamReq && onUpstreamTimeout) {
+      upstreamReq.removeListener('timeout', onUpstreamTimeout);
+    }
   };
 
   function settle(opts: { statusCode?: number; destroyUpstream?: boolean } = {}): void {
@@ -46,12 +71,15 @@ export const proxyBeacon = (
       clearTimeout(timers.wall);
     }
     if (opts.destroyUpstream !== false && upstreamReq && !upstreamReq.destroyed) {
+      const ignoreDestroyError = (): void => undefined;
+      upstreamReq.once('error', ignoreDestroyError);
       try {
         upstreamReq.destroy();
       } catch {
-        // ignore
+        upstreamReq.removeListener('error', ignoreDestroyError);
       }
     }
+    cleanup();
     endClient(httpResp, opts.statusCode);
   }
 
@@ -92,7 +120,10 @@ export const proxyBeacon = (
       reqHeaders['X-Connecting-IP'] = clientIp;
     }
 
-    const url = new URL(`${config.serviceOrigin}/${config.trackingId}.gif${search}`);
+    const url = new URL(config.serviceOrigin);
+    url.pathname = `/${config.trackingId}.gif`;
+    url.search = search;
+    url.hash = '';
 
     upstreamReq = requestFn(
       url,
@@ -128,7 +159,6 @@ export const proxyBeacon = (
               if (config.forwardedCookies.has(setCookieName(item))) {
                 rewritten.push(
                   rewriteSetCookie(item, {
-                    trackingId: config.trackingId,
                     beaconPath: config.beaconPath,
                     hostname: config.hostname
                   })
@@ -147,17 +177,33 @@ export const proxyBeacon = (
           httpResp.setHeader(hName, value);
         }
 
-        if (!httpResp.headersSent) {
-          httpResp.writeHead(resp.statusCode ?? 204);
-        }
+        const chunks: Buffer[] = [];
+        let bodyBytes = 0;
 
         resp.on('data', (chunk: Buffer | string) => {
-          if (!settled && !httpResp.finished && !httpResp.writableEnded && !httpResp.writableFinished) {
-            httpResp.write(chunk);
+          if (settled) {
+            return;
           }
+
+          const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+          bodyBytes += buffer.length;
+          if (bodyBytes > MAX_UPSTREAM_BODY_BYTES) {
+            settle({ statusCode: 204 });
+            return;
+          }
+          chunks.push(buffer);
         });
 
         resp.on('end', () => {
+          if (settled) {
+            return;
+          }
+          if (!httpResp.headersSent) {
+            httpResp.writeHead(resp.statusCode ?? 204);
+          }
+          if (chunks.length && !httpResp.finished && !httpResp.writableEnded && !httpResp.writableFinished) {
+            httpResp.write(Buffer.concat(chunks, bodyBytes));
+          }
           settle({ destroyUpstream: false });
         });
 
@@ -167,10 +213,14 @@ export const proxyBeacon = (
       }
     );
 
-    httpReq.on('aborted', () => onFail());
-    httpReq.socket?.on('error', onFail);
-    upstreamReq.on('error', onFail);
-    upstreamReq.on('timeout', onFail);
+    onClientAborted = onFail;
+    onClientSocketError = onFail;
+    onUpstreamError = onFail;
+    onUpstreamTimeout = onFail;
+    httpReq.once('aborted', onClientAborted);
+    clientSocket?.once('error', onClientSocketError);
+    upstreamReq.once('error', onUpstreamError);
+    upstreamReq.once('timeout', onUpstreamTimeout);
 
     upstreamReq.setNoDelay(true);
     upstreamReq.end();

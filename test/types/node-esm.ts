@@ -3,7 +3,7 @@ import {
   resolveConfig,
   type OstrioAnalyticsMiddlewareConfig,
   type ResolvedMiddlewareConfig
-} from 'ostrio-analytics-middleware';
+} from '@ostrio/analytics-middleware';
 
 import {
   createTracker,
@@ -11,7 +11,7 @@ import {
   type CreateTrackerOptions,
   type OstrioWebAnalytics,
   type OstrioWebAnalyticsConfig
-} from 'ostrio-analytics-middleware/client';
+} from '@ostrio/analytics-middleware/client';
 
 const config: OstrioAnalyticsMiddlewareConfig = {
   trackingId: 'fffffffffffffffff',

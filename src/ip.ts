@@ -2,8 +2,8 @@ import type { IncomingMessage } from 'node:http';
 
 export const defaultResolveClientIp = (req: IncomingMessage): string | false => {
   const { headers, socket } = req;
-  if (headers['cf-ray'] && headers['cf-connecting-ip']) {
-    return headers['cf-connecting-ip'] as string;
+  if (typeof headers['cf-ray'] === 'string' && typeof headers['cf-connecting-ip'] === 'string') {
+    return headers['cf-connecting-ip'];
   }
   return socket?.remoteAddress || false;
 };

@@ -2,7 +2,7 @@ import typescript from '@rollup/plugin-typescript';
 import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
 
-const banner = '/*! ostrio-analytics-middleware v1.0.0 | BSD-3-Clause */';
+const banner = '/*! @ostrio/analytics-middleware v1.0.0 | BSD-3-Clause */';
 
 const externals = ['ostrio-analytics', 'node:https', 'node:http', 'https', 'http'];
 
@@ -30,7 +30,7 @@ const makeConfig = (input, outputFile, format, plugins) => ({
     file: outputFile,
     format,
     exports: 'named',
-    sourcemap: true,
+    sourcemap: false,
     banner
   },
   external: isExternal,

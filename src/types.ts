@@ -1,5 +1,4 @@
 import type { IncomingMessage } from 'node:http';
-import type { OstrioWebAnalyticsConfig } from 'ostrio-analytics';
 
 export interface OstrioAnalyticsMiddlewareConfig {
   trackingId: string;
@@ -13,11 +12,6 @@ export interface OstrioAnalyticsMiddlewareConfig {
   wallTimeoutMs?: number;
   maxSearchLen?: number;
   resolveClientIp?: (req: IncomingMessage) => string | false;
-}
-
-export interface CreateTrackerOptions extends OstrioWebAnalyticsConfig {
-  trackingId: string;
-  endpoint: string;
 }
 
 export interface ResolvedMiddlewareConfig {

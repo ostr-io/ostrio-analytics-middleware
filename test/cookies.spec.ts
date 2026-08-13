@@ -18,12 +18,27 @@ describe('cookies', () => {
   it('rewriteSetCookie rewrites path and domain', () => {
     const inCookie = 'ot=1; Path=/abc.gif; Domain=analytics.ostr.io';
     const out = rewriteSetCookie(inCookie, {
-      trackingId: 'abc',
       beaconPath: '/service/__a/abc.gif',
       hostname: 'example.com'
     });
     expect(out).to.include('/service/__a/abc.gif');
     expect(out).to.include('example.com');
     expect(out).to.not.include('analytics.ostr.io');
+  });
+
+  it('scopes cookies to beacon path and does not rewrite cookie values', () => {
+    const out = rewriteSetCookie('ot=analytics.ostr.io; Path=/; Domain=analytics.ostr.io', {
+      beaconPath: '/service/__a/abc.gif',
+      hostname: 'example.com'
+    });
+    expect(out).to.equal('ot=analytics.ostr.io; Path=/service/__a/abc.gif; Domain=example.com');
+  });
+
+  it('rewrites any Set-Cookie Domain to the configured hostname', () => {
+    const out = rewriteSetCookie('ot=1; Path=/; Domain=self-hosted.example', {
+      beaconPath: '/service/__a/abc.gif',
+      hostname: 'app.example'
+    });
+    expect(out).to.equal('ot=1; Path=/service/__a/abc.gif; Domain=app.example');
   });
 });
